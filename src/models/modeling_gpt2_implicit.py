@@ -3,10 +3,23 @@ import torch.nn as nn
 from transformers import GPT2Model, GPT2LMHeadModel
 from transformers.modeling_outputs import BaseModelOutputWithPastAndCrossAttentions, CausalLMOutputWithCrossAttentions
 from typing import Optional, Tuple, Union, Dict, Any
+from neural_process import *
 
 class GPT2ImplicitModel(GPT2Model):
     def __init__(self, config):
         super().__init__(config)
+        self.config = config
+        if config.np:
+            self.latent_encoder = LatentEncoder(input_dim=config.np_input_dim, num_hidden=config.np_num_hidden,
+                                                num_latent=config.np_num_latent, cross_attn=config.np_use_cross_attn,
+                                                transformer=config.np_use_transformer, t_nhead=config.np_t_nhead,
+                                                t_num_lyrs=config.np_t_num_lyrs, t_dim_feedforward=config.np_t_dim_feedforward,
+                                                t_dropout=config.np_t_dropout)
+            self.deterministic_encoder = DeterministicEncoder(num_hidden=config.np_num_hidden, input_dim=config.np_input_dim,
+                                                              use_transformer=config.np_use_transformer, t_nhead=config.np_t_nhead,
+                                                              t_num_lyrs=config.np_t_num_lyrs, t_dim_feedforward=config.np_t_dim_feedforward,
+                                                              t_dropout=config.np_t_dropout)
+            self.decoder = Decoder(output_dim=config.np_input_dim, num_hidden=config.np_num_hidden, num_lyrs=config.np_t_num_lyrs)
 
     def forward(
         self,
@@ -144,6 +157,8 @@ class GPT2ImplicitModel(GPT2Model):
         all_hidden_states = () if output_hidden_states else None
         zs = []
         f_h_cs = []
+        states_seq = []
+        np_states = []
         #import pdb; pdb.set_trace()
         if rnn is not None:
             rnn_state = None
@@ -237,18 +252,77 @@ class GPT2ImplicitModel(GPT2Model):
                 else:
                     for batch_id in range(positions_to_take.shape[0]):
                         hidden_states[batch_id, positions_to_take[batch_id]] = next_input[batch_id]
-            elif mode == 'forward_student':
+            if mode == 'forward_student':
                 assert states_to_substitute is not None
                 hidden_size = hidden_states.shape[-1]
                 #zs.append(hidden_states.gather(1, first_ids.view(-1, 1, 1).expand(-1, -1, hidden_size)).squeeze(1))
                 hidden_states_orig = hidden_states
                 if requires_backward:
                     hidden_states = hidden_states.clone()
-                if positions_to_substitute.eq(positions_to_substitute[0]).all():
-                    hidden_states[:, positions_to_substitute[0]] = states_to_substitute[i]
+
+                if not self.config.np:
+                    if positions_to_substitute.eq(positions_to_substitute[0]).all():
+                        hidden_states[:, positions_to_substitute[0]] = states_to_substitute[i]
+                        states_seq.append(states_to_substitute[i].unsqueeze(0).expand(batch_size, -1))
+                    else:
+                        for batch_id in range(batch_size):
+                            hidden_states[batch_id, positions_to_substitute[batch_id]] = states_to_substitute[i][batch_id]
+
                 else:
-                    for batch_id in range(batch_size):
-                        hidden_states[batch_id, positions_to_substitute[batch_id]] = states_to_substitute[i][batch_id]
+                    if self.training:
+                        if positions_to_substitute.eq(positions_to_substitute[0]).all():
+                            hidden_states[:, positions_to_substitute[0]] = states_to_substitute[i]
+                            states_seq.append(states_to_substitute[i].unsqueeze(0).expand(batch_size, -1))
+                        else:
+                            for batch_id in range(batch_size):
+                                hidden_states[batch_id, positions_to_substitute[batch_id]] = states_to_substitute[i][batch_id]
+
+                            states_seq.append(states_to_substitute[i])
+
+
+                    if i < 2:
+                        f_h_cs.append(mlps[i](hidden_states))
+
+                    else:
+                        posterior_mu, posterior_var = None, None
+                        if self.training:
+                            seq_x = torch.stack(states_seq, dim=1)
+                            seq_y = seq_x[:, 1:-1]
+                            target_x = seq_x[:, -2]
+                            seq_x = seq_x[:, :-2]
+                            posterior_mu, posterior_var, posterior = self.latent_encoder(target_x, states_seq[-1], target_x)
+                        else:
+                            seq_x = torch.stack(states_seq, dim=1)
+                            seq_y = seq_x[:, 1:]
+                            target_x = seq_x[:, -1]
+                            seq_x = seq_x[:, :-1]
+
+                        prior_mu, prior_var, prior = self.latent_encoder(seq_x, seq_y, target_x)
+
+                        if self.training:
+                            z = posterior
+
+                        else:
+                            z = prior
+
+                        r = self.deterministic_encoder(seq_x, seq_y, target_x)
+
+                        y_pred = self.decoder(r, z, target_x)
+
+                        f_h_cs.append(y_pred)
+
+                        np_state = [prior_mu, prior_var, posterior_mu, posterior_var]
+                        np_states.append(np_state)
+
+                    if not self.training:
+                        if positions_to_substitute.eq(positions_to_substitute[0]).all():
+                            hidden_states[:, positions_to_substitute[0]] = f_h_cs[i]
+                            states_seq.append(f_h_cs[i].unsqueeze(0).expand(batch_size, -1))
+                        else:
+                            for batch_id in range(batch_size):
+                                hidden_states[batch_id, positions_to_substitute[batch_id]] = f_h_cs[i][batch_id]
+
+                            states_seq.append(f_h_cs[i])
 
 
             if self.gradient_checkpointing and self.training:
@@ -319,6 +393,7 @@ class GPT2ImplicitModel(GPT2Model):
         )
         outputs.zs = zs
         outputs.f_h_cs = f_h_cs
+        outputs.np_states = np_states
         return outputs
 
 class GPT2LMHeadImplicitModel(GPT2LMHeadModel):
@@ -415,6 +490,7 @@ class GPT2LMHeadImplicitModel(GPT2LMHeadModel):
         )
         zs = transformer_outputs.zs
         f_h_cs = transformer_outputs.f_h_cs
+        np_states = transformer_outputs.np_states
         hidden_states = transformer_outputs[0]
 
         # Set device for model parallelism
@@ -432,7 +508,7 @@ class GPT2LMHeadImplicitModel(GPT2LMHeadModel):
             shift_logits = lm_logits[..., :-1, :].contiguous()
             shift_labels = labels[..., 1:].contiguous()
             # Flatten the tokens
-            loss_fct = CrossEntropyLoss()
+            loss_fct = nn.CrossEntropyLoss()
             loss = loss_fct(shift_logits.view(-1, shift_logits.size(-1)), shift_labels.view(-1))
 
         if not return_dict:
@@ -449,6 +525,7 @@ class GPT2LMHeadImplicitModel(GPT2LMHeadModel):
         )
         outputs.zs = zs
         outputs.f_h_cs = f_h_cs
+        outputs.np_states = np_states
         return outputs
 
     def prepare_inputs_for_generation(self, input_ids, past_key_values=None, inputs_embeds=None, positions_to_substitute=None, states_to_substitute=None, mode=None, **kwargs):

@@ -91,6 +91,7 @@ def main():
     parser.add_argument('--batch_size', type=int, default=32)
     parser.add_argument('--lr', type=float, default=5e-5)
     parser.add_argument('--max_grad_norm', type=float, default=1.0)
+    parser.add_argument('--use_neural_process', type=bool, default=True)
     parser.add_argument('--subset', type=str, choices=['diagonal', 'last_column', 'top_row', 'bottom_row', 'first_column'], default='diagonal')
     args = parser.parse_args()
 
@@ -103,7 +104,15 @@ def main():
     print (ptdtype, dtype, device)
 
     # Create Student
-    config = StudentConfig(base_model=args.base_model)
+    config = StudentConfig(base_model=args.base_model, 
+                           np = True,
+                           np_num_latent = 1024,
+                           np_use_cross_attn = True,
+                           np_use_transformer = True,
+                           np_t_nhead = 8,
+                           np_t_num_lyrs = 3,
+                           np_t_dim_feedforward = 1024,
+                           np_t_dropout = 0.3)
     student = Student(config).to(device).to(ptdtype)
 
     # Load Teacher

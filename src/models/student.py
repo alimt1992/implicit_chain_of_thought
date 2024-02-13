@@ -26,13 +26,20 @@ class Student(nn.Module):
                  nn.ReLU(),
                  nn.Linear(4*hidden_size, hidden_size),
                  ) for _ in range(num_layers)])
+        
+        self.starter_mlps = nn.ModuleList([nn.Sequential(
+                 nn.Linear(hidden_size, 4*hidden_size),
+                 nn.ReLU(),
+                 nn.Linear(4*hidden_size, hidden_size),
+                 ) for _ in range(2)])
 
     def forward(self, input_ids, positions_to_substitute, teacher_states, output_hidden_states=False):
         outputs = self.base_model.forward(mode='forward_student', \
                 input_ids=input_ids, \
                 positions_to_substitute=positions_to_substitute, \
                 states_to_substitute=teacher_states, \
-                output_hidden_states=output_hidden_states)
+                output_hidden_states=output_hidden_states, \
+                mlps=self.starter_mlps)
         return outputs
 
     def compute_loss(self, input_ids, labels, teacher_states):
@@ -40,10 +47,12 @@ class Student(nn.Module):
         sep_positions = get_sep_position(input_ids, self.tokenizer.eos_token_id)
         # First, project teacher states
         teacher_states = [self.mlps[l](teacher_states[l]) for l in range(len(teacher_states))]
+        batch_size = input_ids.shape[0]
 
         # Forward while substituting teacher states
         outputs = self.forward(input_ids, sep_positions, teacher_states)
         logits = outputs.logits
+        np_states = outputs.np_states
 
         labels_pred = logits.argmax(-1)
         mask = labels[...,1:].ge(0)
@@ -54,12 +63,24 @@ class Student(nn.Module):
         shift_logits = logits[..., :-1, :].contiguous()
         shift_labels = labels[..., 1:].contiguous()
         loss_fct = nn.CrossEntropyLoss()
-        loss = loss_fct(shift_logits.view(-1, shift_logits.size(-1)), shift_labels.view(-1))
+        loss1 = loss_fct(shift_logits.view(-1, shift_logits.size(-1)), shift_labels.view(-1))
 
-        outputs.loss = loss
+        loss_fct = nn.MSELoss(reduction='none')
+        loss2 = 0
+        for teacher_state, student_state in zip(teacher_states, outputs.f_h_cs):
+            loss2 += loss_fct(teacher_state, student_state).sum(-1) / 2
+        loss2 = loss2.mean()
+
+        kl = 0
+        for np_state in np_states:
+            prior_mu, prior_var, posterior_mu, posterior_var = np_state
+            kl += self.kl_div(prior_mu, prior_var, posterior_mu, posterior_var)
+        kl = kl.mean()
+
+        outputs.loss = loss1 + loss2 + kl
         outputs.token_accuracy = token_accuracy
         outputs.total_correct = correct_tokens
-        outputs.total_loss = loss * total_tokens
+        outputs.total_loss = loss1 * total_tokens + loss2 * batch_size + kl * len(np_states)
         outputs.total_tokens = total_tokens
         return outputs
 
@@ -104,4 +125,10 @@ class Student(nn.Module):
         self.config.save_pretrained(save_directory)
         state_dict = self.state_dict()
         torch.save(state_dict, os.path.join(save_directory, 'state_dict.bin'))
+
+
+def kl_div(self, prior_mu, prior_var, posterior_mu, posterior_var):
+        kl_div = (torch.exp(posterior_var) + (posterior_mu-prior_mu) ** 2) / torch.exp(prior_var) - 1. + (prior_var - posterior_var)
+        kl_div = 0.5 * kl_div.sum()
+        return kl_div
 

@@ -37,12 +37,16 @@ def evaluate(dataloader, tokenizer, ctx, emulator, student, max_new_tokens):
 
     for batch in tqdm.tqdm(dataloader):
         input_ids_all = batch['input_ids_nocot'].to(device)
+        batch_size = input_ids_all.shape[0]
         # Remove answer part
         sep_positions = get_sep_position(input_ids_all, tokenizer.eos_token_id)
         input_ids = input_ids_all[:, :sep_positions.max()+1]
         start_time = time.time()
         with ctx:
-            emulated_teacher_states = emulator(input_ids)
+            if emulator is not None:
+                emulated_teacher_states = emulator(input_ids)
+            else:
+                emulated_teacher_states = [torch.zeros(batch_size, student.hidden_size) for i in range(len(sep_positions))]
 
             # Generate from student
             beam_output = student.generate(
@@ -93,13 +97,18 @@ def main():
 
 
     # Load Models
-    emulator = Emulator.from_pretrained(args.emulator_path).to(device).to(ptdtype)
+    emulator = None
+    if args.emulator_path is not None:
+        emulator = Emulator.from_pretrained(args.emulator_path).to(device).to(ptdtype)
     student = Student.from_pretrained(args.student_path).to(device).to(ptdtype)
     emulator.eval()
     student.eval()
 
     # Load data
-    tokenizer = emulator.tokenizer
+    if args.emulator_path is not None:
+        tokenizer = emulator.tokenizer
+    else:
+        tokenizer = student.tokenizer
     collate_fn = CoTDataCollator(tokenizer)
     test_dataset = CoTDataset(tokenizer, args.test_path, 1024)
     test_dataloader = DataLoader(test_dataset, batch_size=args.batch_size, collate_fn=collate_fn, shuffle=False)
