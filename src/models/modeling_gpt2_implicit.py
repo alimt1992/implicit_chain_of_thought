@@ -3,7 +3,7 @@ import torch.nn as nn
 from transformers import GPT2Model, GPT2LMHeadModel
 from transformers.modeling_outputs import BaseModelOutputWithPastAndCrossAttentions, CausalLMOutputWithCrossAttentions
 from typing import Optional, Tuple, Union, Dict, Any
-from neural_process import *
+from .neural_process import *
 
 class GPT2ImplicitModel(GPT2Model):
     def __init__(self, config):
