@@ -24,14 +24,8 @@ class StudentConfig(PretrainedConfig):
         self.mixture_size = mixture_size
 
         self.np = np
-        if np_input_dim == None:
-            self.np_input_dim = self.hidden_size
-        else:
-            self.np_input_dim = np_input_dim
-        if np_num_hidden == None:
-            self.np_input_dim = self.hidden_size
-        else:
-            self.np_num_hidden = np_num_hidden
+        self.np_input_dim = np_input_dim
+        self.np_num_hidden = np_num_hidden
         self.np_num_latent = np_num_latent
         self.np_use_cross_attn = np_use_cross_attn
         self.np_use_transformer = np_use_transformer

@@ -113,10 +113,12 @@ def main():
                            np_t_num_lyrs = 3,
                            np_t_dim_feedforward = 1024,
                            np_t_dropout = 0.3)
-    student = Student(config).to(device).to(ptdtype)
 
     # Load Teacher
     teacher = Teacher.from_pretrained(args.teacher).to(device).to(ptdtype)
+    config.np_input_dim = teacher.base_model.config.hidden_size
+    config.np_num_hidden = teacher.base_model.config.hidden_size
+    student = Student(config).to(device).to(ptdtype)
 
     # Load data
     tokenizer = teacher.tokenizer
