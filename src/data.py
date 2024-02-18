@@ -130,7 +130,7 @@ class CoTDataset(Dataset):
         # print(self.tgt_sent_nocot[0])
 
     def __len__(self):
-        return len(self.examples_cot)
+        return len(self.edited_sents_cot)
 
     # def __getitem__(self, i) -> torch.Tensor:
     def __getitem__(self, i):
@@ -138,15 +138,15 @@ class CoTDataset(Dataset):
         
         bos_tok = self.tokenizer.bos_token
 
-        batch_encoding_cot = self.tokenizer([self.edited_sents_cot[i]], add_special_tokens=True, truncation=True, max_length=self.max_length)[0]
-        batch_encoding_only = self.tokenizer([self.edited_sents_only[i]], add_special_tokens=True, truncation=True, max_length=self.max_length)[0]
-        batch_encoding_all = self.tokenizer([self.edited_sents_all[i]], add_special_tokens=True, truncation=True, max_length=self.max_length)[0]
-        batch_encoding_nocot = self.tokenizer([self.edited_sents_nocot[i]], add_special_tokens=True, truncation=True, max_length=self.max_length)[0]
+        batch_encoding_cot = self.tokenizer([self.edited_sents_cot[i]], add_special_tokens=True, truncation=True, max_length=self.max_length)
+        batch_encoding_only = self.tokenizer([self.edited_sents_only[i]], add_special_tokens=True, truncation=True, max_length=self.max_length)
+        batch_encoding_all = self.tokenizer([self.edited_sents_all[i]], add_special_tokens=True, truncation=True, max_length=self.max_length)
+        batch_encoding_nocot = self.tokenizer([self.edited_sents_nocot[i]], add_special_tokens=True, truncation=True, max_length=self.max_length)
 
-        examples_cot = batch_encoding_cot["input_ids"]
-        examples_only = batch_encoding_only["input_ids"]
-        examples_all = batch_encoding_all["input_ids"]
-        examples_nocot = batch_encoding_nocot["input_ids"]
+        examples_cot = batch_encoding_cot["input_ids"][0]
+        examples_only = batch_encoding_only["input_ids"][0]
+        examples_all = batch_encoding_all["input_ids"][0]
+        examples_nocot = batch_encoding_nocot["input_ids"][0]
 
         labels_cot = copy.deepcopy(examples_cot)
         labels_all = copy.deepcopy(examples_all)
