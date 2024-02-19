@@ -3,24 +3,11 @@ import torch.nn as nn
 from transformers import GPT2Model, GPT2LMHeadModel
 from transformers.modeling_outputs import BaseModelOutputWithPastAndCrossAttentions, CausalLMOutputWithCrossAttentions
 from typing import Optional, Tuple, Union, Dict, Any
-from .neural_process import *
 
 class GPT2ImplicitModel(GPT2Model):
     def __init__(self, config):
         super().__init__(config)
         self.config = config
-        if hasattr(config, 'np'):
-            if config.np:
-                self.latent_encoder = LatentEncoder(input_dim=config.np_input_dim, num_hidden=config.np_num_hidden,
-                                                    num_latent=config.np_num_latent, cross_attn=config.np_use_cross_attn,
-                                                    transformer=config.np_use_transformer, t_nhead=config.np_t_nhead,
-                                                    t_num_lyrs=config.np_t_num_lyrs, t_dim_feedforward=config.np_t_dim_feedforward,
-                                                    t_dropout=config.np_t_dropout)
-                self.deterministic_encoder = DeterministicEncoder(num_hidden=config.np_num_hidden, input_dim=config.np_input_dim,
-                                                                  use_transformer=config.np_use_transformer, t_nhead=config.np_t_nhead,
-                                                                  t_num_lyrs=config.np_t_num_lyrs, t_dim_feedforward=config.np_t_dim_feedforward,
-                                                                  t_dropout=config.np_t_dropout)
-                self.decoder = Decoder(output_dim=config.np_input_dim, num_hidden=config.np_num_hidden, num_lyrs=config.np_t_num_lyrs)
 
     def forward(
         self,
@@ -58,6 +45,10 @@ class GPT2ImplicitModel(GPT2Model):
         residual=False,
         requires_backward=False,
         phase2=False,
+        np=False,
+        np_latent_encoder=None,
+        np_deterministic_encoder=None,
+        np_decoder=None
     ) -> Union[Tuple, BaseModelOutputWithPastAndCrossAttentions]:
         output_attentions = output_attentions if output_attentions is not None else self.config.output_attentions
         output_hidden_states = (
@@ -261,7 +252,7 @@ class GPT2ImplicitModel(GPT2Model):
                 if requires_backward:
                     hidden_states = hidden_states.clone()
 
-                if not self.config.np:
+                if not np:
                     if positions_to_substitute.eq(positions_to_substitute[0]).all():
                         hidden_states[:, positions_to_substitute[0]] = states_to_substitute[i]
                         states_seq.append(states_to_substitute[i].unsqueeze(0).expand(batch_size, -1))
@@ -291,14 +282,14 @@ class GPT2ImplicitModel(GPT2Model):
                             seq_y = seq_x[:, 1:-1]
                             target_x = seq_x[:, -2]
                             seq_x = seq_x[:, :-2]
-                            posterior_mu, posterior_var, posterior = self.latent_encoder(target_x, states_seq[-1], target_x)
+                            posterior_mu, posterior_var, posterior = np_latent_encoder(target_x, states_seq[-1], target_x)
                         else:
                             seq_x = torch.stack(states_seq, dim=1)
                             seq_y = seq_x[:, 1:]
                             target_x = seq_x[:, -1]
                             seq_x = seq_x[:, :-1]
 
-                        prior_mu, prior_var, prior = self.latent_encoder(seq_x, seq_y, target_x)
+                        prior_mu, prior_var, prior = np_latent_encoder(seq_x, seq_y, target_x)
 
                         if self.training:
                             z = posterior
@@ -306,9 +297,9 @@ class GPT2ImplicitModel(GPT2Model):
                         else:
                             z = prior
 
-                        r = self.deterministic_encoder(seq_x, seq_y, target_x)
+                        r = np_deterministic_encoder(seq_x, seq_y, target_x)
 
-                        y_pred = self.decoder(r, z, target_x)
+                        y_pred = np_decoder(r, z, target_x)
 
                         f_h_cs.append(y_pred)
 
@@ -445,6 +436,10 @@ class GPT2LMHeadImplicitModel(GPT2LMHeadModel):
         residual=False,
         requires_backward=False,
         phase2=False,
+        np=False,
+        np_latent_encoder=None,
+        np_deterministic_encoder=None,
+        np_decoder=None
     ) -> Union[Tuple, CausalLMOutputWithCrossAttentions]:
         r"""
         labels (`torch.LongTensor` of shape `(batch_size, sequence_length)`, *optional*):
@@ -488,6 +483,10 @@ class GPT2LMHeadImplicitModel(GPT2LMHeadModel):
             residual=residual,
             requires_backward=requires_backward,
             mode=mode,
+            np=np,
+            np_latent_encoder=np_latent_encoder,
+            np_deterministic_encoder=np_deterministic_encoder,
+            np_decoder=np_decoder
         )
         zs = transformer_outputs.zs
         f_h_cs = transformer_outputs.f_h_cs

@@ -9,6 +9,7 @@ sys.path.append("..")
 from utils import get_sep_position
 from .configuration_student import StudentConfig
 from .modeling_gpt2_implicit import GPT2LMHeadImplicitModel
+from .neural_process import *
 
 class Student(nn.Module):
     def __init__(self, config):
@@ -20,6 +21,24 @@ class Student(nn.Module):
         hidden_size = self.base_model.config.hidden_size
         self.num_layers = num_layers
         self.hidden_size = hidden_size
+
+
+        
+        self.latent_encoder = None
+        self.deterministic_encoder = None
+        self.decoder = None
+        if hasattr(config, 'np'):
+            if config.np:
+                self.latent_encoder = LatentEncoder(input_dim=config.np_input_dim, num_hidden=config.np_num_hidden,
+                                                    num_latent=config.np_num_latent, cross_attn=config.np_use_cross_attn,
+                                                    transformer=config.np_use_transformer, t_nhead=config.np_t_nhead,
+                                                    t_num_lyrs=config.np_t_num_lyrs, t_dim_feedforward=config.np_t_dim_feedforward,
+                                                    t_dropout=config.np_t_dropout)
+                self.deterministic_encoder = DeterministicEncoder(num_hidden=config.np_num_hidden, input_dim=config.np_input_dim,
+                                                                  use_transformer=config.np_use_transformer, t_nhead=config.np_t_nhead,
+                                                                  t_num_lyrs=config.np_t_num_lyrs, t_dim_feedforward=config.np_t_dim_feedforward,
+                                                                  t_dropout=config.np_t_dropout)
+                self.decoder = Decoder(output_dim=config.np_input_dim, num_hidden=config.np_num_hidden, num_lyrs=config.np_t_num_lyrs)
 
         self.mlps = nn.ModuleList([nn.Sequential(
                  nn.Linear(hidden_size, 4*hidden_size),
@@ -39,7 +58,11 @@ class Student(nn.Module):
                 positions_to_substitute=positions_to_substitute, \
                 states_to_substitute=teacher_states, \
                 output_hidden_states=output_hidden_states, \
-                mlps=self.starter_mlps)
+                mlps=self.starter_mlps,
+                np=self.config.np,
+                np_latent_encoder=self.latent_encoder,
+                np_deterministic_encoder=self.deterministic_encoder,
+                np_decoder=self.decoder)
         return outputs
 
     def compute_loss(self, input_ids, labels, teacher_states):
