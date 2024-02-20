@@ -35,7 +35,7 @@ class Student(nn.Module):
                                                     t_num_lyrs=config.np_t_num_lyrs, t_dim_feedforward=config.np_t_dim_feedforward,
                                                     t_dropout=config.np_t_dropout)
                 self.deterministic_encoder = DeterministicEncoder(num_hidden=config.np_num_hidden, input_dim=config.np_input_dim,
-                                                                  use_transformer=config.np_use_transformer, t_nhead=config.np_t_nhead,
+                                                                  transformer=config.np_use_transformer, t_nhead=config.np_t_nhead,
                                                                   t_num_lyrs=config.np_t_num_lyrs, t_dim_feedforward=config.np_t_dim_feedforward,
                                                                   t_dropout=config.np_t_dropout)
                 self.decoder = Decoder(output_dim=config.np_input_dim, num_hidden=config.np_num_hidden, num_lyrs=config.np_t_num_lyrs)
