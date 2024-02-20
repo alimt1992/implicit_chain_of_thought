@@ -255,7 +255,8 @@ class GPT2ImplicitModel(GPT2Model):
                 if not np:
                     if positions_to_substitute.eq(positions_to_substitute[0]).all():
                         hidden_states[:, positions_to_substitute[0]] = states_to_substitute[i]
-                        states_seq.append(states_to_substitute[i].unsqueeze(0).expand(batch_size, -1))
+                        # states_seq.append(states_to_substitute[i].unsqueeze(0).expand(batch_size, -1))
+                        states_seq.append(states_to_substitute[i])
                     else:
                         for batch_id in range(batch_size):
                             hidden_states[batch_id, positions_to_substitute[batch_id]] = states_to_substitute[i][batch_id]
@@ -264,7 +265,8 @@ class GPT2ImplicitModel(GPT2Model):
                     if self.training:
                         if positions_to_substitute.eq(positions_to_substitute[0]).all():
                             hidden_states[:, positions_to_substitute[0]] = states_to_substitute[i]
-                            states_seq.append(states_to_substitute[i].unsqueeze(0).expand(batch_size, -1))
+                            # states_seq.append(states_to_substitute[i].unsqueeze(0).expand(batch_size, -1))
+                            states_seq.append(states_to_substitute[i])
                         else:
                             for batch_id in range(batch_size):
                                 hidden_states[batch_id, positions_to_substitute[batch_id]] = states_to_substitute[i][batch_id]
@@ -309,7 +311,8 @@ class GPT2ImplicitModel(GPT2Model):
                     if not self.training:
                         if positions_to_substitute.eq(positions_to_substitute[0]).all():
                             hidden_states[:, positions_to_substitute[0]] = f_h_cs[i]
-                            states_seq.append(f_h_cs[i].unsqueeze(0).expand(batch_size, -1))
+                            # states_seq.append(f_h_cs[i].unsqueeze(0).expand(batch_size, -1))
+                            states_seq.append(f_h_cs[i])
                         else:
                             for batch_id in range(batch_size):
                                 hidden_states[batch_id, positions_to_substitute[batch_id]] = f_h_cs[i][batch_id]
