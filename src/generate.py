@@ -103,6 +103,7 @@ def main():
         emulator.eval()
     student = Student.from_pretrained(args.student_path).to(device).to(ptdtype)
     student.eval()
+    student.std_training = False
 
     # Load data
     if args.emulator_path is not None:

@@ -262,7 +262,7 @@ class GPT2ImplicitModel(GPT2Model):
                             hidden_states[batch_id, positions_to_substitute[batch_id]] = states_to_substitute[i][batch_id]
 
                 else:
-                    if self.training:
+                    if self.std_training:
                         if positions_to_substitute.eq(positions_to_substitute[0]).all():
                             hidden_states[:, positions_to_substitute[0]] = states_to_substitute[i]
                             # states_seq.append(states_to_substitute[i].unsqueeze(0).expand(batch_size, -1))
@@ -274,26 +274,29 @@ class GPT2ImplicitModel(GPT2Model):
                             states_seq.append(states_to_substitute[i])
 
 
-                    if i < 2:
-                        f_h_cs.append(mlps[i](hidden_states))
+                    if i < 3:
+                        f_h_cs.append(mlps[i](hidden_states))#####################
 
-                    else:
+                    else:##################correct for sequence length of 1
                         posterior_mu, posterior_var = None, None
-                        if self.training:
+                        if self.std_training:
                             seq_x = torch.stack(states_seq, dim=1)
                             seq_y = seq_x[:, 1:-1]
-                            target_x = seq_x[:, -2]
+                            seq_y = seq_y.reshape(seq_y.shape[0], -1, seq_y.shape[-1])
+                            target_x = seq_x[:, :-1]
+                            target_y = seq_x[:, 1:]
                             seq_x = seq_x[:, :-2]
-                            posterior_mu, posterior_var, posterior = np_latent_encoder(target_x, states_seq[-1], target_x)
+                            seq_x = seq_x.reshape(seq_x.shape[0], -1, seq_x.shape[-1])
+                            posterior_mu, posterior_var, posterior = np_latent_encoder(target_x, target_y, target_x)
                         else:
                             seq_x = torch.stack(states_seq, dim=1)
                             seq_y = seq_x[:, 1:]
-                            target_x = seq_x[:, -1]
+                            target_x = seq_x
                             seq_x = seq_x[:, :-1]
 
                         prior_mu, prior_var, prior = np_latent_encoder(seq_x, seq_y, target_x)
 
-                        if self.training:
+                        if self.std_training:
                             z = posterior
 
                         else:
@@ -308,7 +311,7 @@ class GPT2ImplicitModel(GPT2Model):
                         np_state = [prior_mu, prior_var, posterior_mu, posterior_var]
                         np_states.append(np_state)
 
-                    if not self.training:
+                    if not self.std_training:
                         if positions_to_substitute.eq(positions_to_substitute[0]).all():
                             hidden_states[:, positions_to_substitute[0]] = f_h_cs[i]
                             # states_seq.append(f_h_cs[i].unsqueeze(0).expand(batch_size, -1))

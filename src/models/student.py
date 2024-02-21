@@ -50,7 +50,7 @@ class Student(nn.Module):
                  nn.Linear(hidden_size, 4*hidden_size),
                  nn.ReLU(),
                  nn.Linear(4*hidden_size, hidden_size),
-                 ) for _ in range(2)])
+                 ) for _ in range(3)])
 
     def forward(self, input_ids, positions_to_substitute, teacher_states, output_hidden_states=False):
         outputs = self.base_model.forward(mode='forward_student', \
