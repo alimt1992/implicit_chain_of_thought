@@ -41,6 +41,14 @@ As an example, let's take a look at the first line from the 4 X 4 Mult test set 
 
 In this example, the input is `9 1 7 3 * 9 4 3 3` (corresponding to `3719*3349`), the chain-of-thought is `1 7 4 3 3 + 0 6 7 8 4 1 ( 1 3 2 2 8 1 ) + 0 0 7 5 1 1 1 ( 1 3 9 7 9 2 1 ) + 0 0 0 7 5 1 1 1`, and the output is `1 3 9 4 5 4 2 1` (corresponding to `12454931`).
 
+For multi-task training the data format is:
+
+```
+[input 1], [input 2]||[chain-of-thought 1], [chain-of-thought 2] #### [output 1], [output 2]
+...
+```
+
+
 Note that for Teacher Training, (a) Mind-Reading the Teacher, and (b) Thought Emulation, the chain-of-thought steps are used; but for (c) Couple and Optimize the chain-of-thought steps are not used.
 
 ### Training

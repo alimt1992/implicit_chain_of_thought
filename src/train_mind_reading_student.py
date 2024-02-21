@@ -107,7 +107,7 @@ def main():
     config = StudentConfig(base_model=args.base_model, 
                            np = True,
                            np_num_latent = 1024,
-                           np_use_cross_attn = True,
+                           np_use_cross_attn = False,
                            np_use_transformer = True,
                            np_t_nhead = 8,
                            np_t_num_lyrs = 3,
@@ -135,7 +135,8 @@ def main():
     optimizer = torch.optim.AdamW(trainable_params, lr=args.lr, **extra_args)
 
     teacher.eval()
-    student.eval() # to turn off dropout
+    # student.eval() # to turn off dropout
+    student.train()
 
     for p in teacher.parameters():
         p.requires_grad = False
