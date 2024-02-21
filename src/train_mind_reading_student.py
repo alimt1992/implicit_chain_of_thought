@@ -136,7 +136,7 @@ def main():
 
     teacher.eval()
     student.eval() # to turn off dropout
-    student.std_training = True
+    student.std_train()
 
     for p in teacher.parameters():
         p.requires_grad = False
@@ -166,6 +166,8 @@ def main():
                 print (f"Step: {step}. PPL: {ppl}. Token Accuracy: {token_accuracy}")
                 sys.stdout.flush()
             step += 1
+            if step > 2500:
+                break
         accuracy, token_accuracy, ppl = evaluate(val_dataloader, tokenizer, ctx, teacher, student, args.delta, args.subset, args.max_new_tokens)
         print (f'Val. PPL: {ppl}; Accuracy: {accuracy}; Token Accuracy: {token_accuracy}.')
         student.save_pretrained(os.path.join(args.save_model, f'checkpoint_{epoch}'))

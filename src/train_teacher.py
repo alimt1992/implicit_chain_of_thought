@@ -139,6 +139,8 @@ def main():
             if step % 100 == 0:
                 print (f"Step: {step}. PPL: {ppl}. Token Accuracy: {token_accuracy}")
             step += 1
+            if step > 2500:
+                break
         accuracy, token_accuracy, ppl = evaluate(val_dataloader, tokenizer, ctx, teacher, args.max_new_tokens)
         print (f'Val. PPL: {ppl}; Accuracy: {accuracy}; Token Accuracy: {token_accuracy}.')
         teacher.save_pretrained(os.path.join(args.save_model, f'checkpoint_{epoch}'))

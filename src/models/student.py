@@ -129,6 +129,12 @@ class Student(nn.Module):
             )
             beam_output.append(beam_output_i)
         return beam_output
+    
+    def std_train(self):
+        self.base_model.std_training = True
+    
+    def std_eval(self):
+        self.base_model.std_training = False
 
     @classmethod
     def from_pretrained(self, pretrained_path):
