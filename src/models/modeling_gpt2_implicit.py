@@ -275,7 +275,15 @@ class GPT2ImplicitModel(GPT2Model):
 
 
                     if i < 3:
-                        f_h_cs.append(mlps[i](hidden_states))#####################
+                        if positions_to_substitute.eq(positions_to_substitute[0]).all():
+                            fc_input = hidden_states[:, positions_to_substitute[0]]
+                        else:
+                            fc_input = []
+                            for batch_id in range(batch_size):
+                                fc_input.append(hidden_states[batch_id, positions_to_substitute[batch_id]])
+                            fc_input = torch.stack(fc_input, dim=0)
+                        
+                        f_h_cs.append(mlps[i](fc_input))
 
                     else:##################correct for sequence length of 1
                         posterior_mu, posterior_var = None, None
@@ -304,7 +312,7 @@ class GPT2ImplicitModel(GPT2Model):
 
                         r = np_deterministic_encoder(seq_x, seq_y, target_x)
 
-                        y_pred = np_decoder(r, z, target_x)
+                        y_pred = np_decoder(r, z, target_x[:, -1, :])
 
                         f_h_cs.append(y_pred)
 

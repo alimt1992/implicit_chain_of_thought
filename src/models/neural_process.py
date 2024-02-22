@@ -128,7 +128,7 @@ class DeterministicEncoder(nn.Module):
         for attention in self.cross_attentions:
             query, _ = attention(keys, encoder_input, query)
 
-        return query
+        return query[:, -1, :]
 
 class Decoder(nn.Module):
     """
