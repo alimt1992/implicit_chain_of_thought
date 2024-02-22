@@ -156,7 +156,7 @@ class Student(nn.Module):
         torch.save(state_dict, os.path.join(save_directory, 'state_dict.bin'))
 
 
-def kl_div(self, prior_mu, prior_var, posterior_mu, posterior_var):
+    def kl_div(self, prior_mu, prior_var, posterior_mu, posterior_var):
         kl_div = (torch.exp(posterior_var) + (posterior_mu-prior_mu) ** 2) / torch.exp(prior_var) - 1. + (prior_var - posterior_var)
         kl_div = 0.5 * kl_div.sum()
         return kl_div

@@ -144,7 +144,7 @@ class Decoder(nn.Module):
         # batch_size, num_targets, _ = target_x.size()
         target_x = self.target_projection(target_x)
 
-        hidden = torch.stack([r, z, target_x], dim=-1)
+        hidden = torch.cat([r, z, target_x], dim=-1)
 
         for linear in self.linears:
             hidden = nn.functional.gelu(linear(hidden))

@@ -106,12 +106,12 @@ def main():
     # Create Student
     config = StudentConfig(base_model=args.base_model, 
                            np = True,
-                           np_num_latent = 1024,
+                           np_num_latent = 768,
                            np_use_cross_attn = False,
                            np_use_transformer = False,
                            np_t_nhead = 8,
                            np_t_num_lyrs = 3,
-                           np_t_dim_feedforward = 1024,
+                           np_t_dim_feedforward = 768,
                            np_t_dropout = 0.3)
 
     # Load Teacher
